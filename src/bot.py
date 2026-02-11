@@ -19,7 +19,7 @@ import sys
 import time
 from enum import Enum
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from threading import Thread
+from threading import Event, Thread
 
 from src.config import load_config
 from src.data import (
@@ -64,14 +64,13 @@ class BotState(str, Enum):
 # Graceful shutdown
 # ---------------------------------------------------------------------------
 
-_shutdown_requested = False
+_shutdown_event = Event()
 
 
 def _handle_signal(signum: int, _frame) -> None:
-    global _shutdown_requested
     log.info("Received signal %d — requesting shutdown", signum,
              extra={"event": "shutdown_signal"})
-    _shutdown_requested = True
+    _shutdown_event.set()
 
 
 # ---------------------------------------------------------------------------
@@ -157,14 +156,14 @@ def run_loop() -> None:
     risk_mgr = RiskManager(cfg)
     ctx = _Ctx()
 
-    while not _shutdown_requested:
+    while not _shutdown_event.is_set():
         try:
             tick(ctx, cfg, data_client, trading_client, risk_mgr)
         except Exception as exc:
             log.exception("Unhandled error in tick (%s: %s) — will retry next cycle",
                           type(exc).__name__, exc,
                           extra={"event": "tick_error"})
-        time.sleep(POLL_INTERVAL_SECONDS)
+        _shutdown_event.wait(POLL_INTERVAL_SECONDS)
 
     log.info("Shutting down — flattening positions", extra={"event": "bot_shutdown"})
     close_all_positions(trading_client, dry_run=cfg.dry_run)
@@ -186,7 +185,8 @@ def tick(ctx, cfg, data_client, trading_client, risk_mgr) -> None:
         ctx.direction = None
         ctx.trade_qty = 0
         risk_mgr.reset_daily()
-        _set_state(ctx, BotState.IDLE)
+        if ctx.state != BotState.IDLE:
+            _set_state(ctx, BotState.IDLE)
 
     # --- Pre-market / after-hours → IDLE ---
     if not is_market_open():
