@@ -135,8 +135,9 @@ def run_loop() -> None:
     while not _shutdown_requested:
         try:
             tick(ctx, cfg, data_client, trading_client, risk_mgr)
-        except Exception:
-            log.exception("Unhandled error in tick — will retry next cycle",
+        except Exception as exc:
+            log.exception("Unhandled error in tick (%s: %s) — will retry next cycle",
+                          type(exc).__name__, exc,
                           extra={"event": "tick_error"})
         time.sleep(POLL_INTERVAL_SECONDS)
 
