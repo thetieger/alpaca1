@@ -33,14 +33,19 @@ def is_market_open() -> bool:
     return MARKET_OPEN <= t < MARKET_CLOSE
 
 
+def _today_et() -> date:
+    """Return today's date in US/Eastern (not the server's local date)."""
+    return now_et().date()
+
+
 def market_open_today() -> datetime:
     """Return today's 09:30 ET as an aware datetime."""
-    return ET.localize(datetime.combine(date.today(), MARKET_OPEN))
+    return ET.localize(datetime.combine(_today_et(), MARKET_OPEN))
 
 
 def market_close_today() -> datetime:
     """Return today's 16:00 ET as an aware datetime."""
-    return ET.localize(datetime.combine(date.today(), MARKET_CLOSE))
+    return ET.localize(datetime.combine(_today_et(), MARKET_CLOSE))
 
 
 def entry_window_end(entry_window_minutes: int) -> datetime:
@@ -66,7 +71,7 @@ def seconds_until_market_open() -> float:
         elif n.weekday() == 5:  # Saturday
             days_ahead = 2
         open_dt = ET.localize(
-            datetime.combine(date.today() + timedelta(days=days_ahead), MARKET_OPEN)
+            datetime.combine(_today_et() + timedelta(days=days_ahead), MARKET_OPEN)
         )
     return (open_dt - n).total_seconds()
 

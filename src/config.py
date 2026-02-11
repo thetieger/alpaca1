@@ -15,8 +15,10 @@ load_dotenv()
 
 def _env(key: str, default: str | None = None, *, required: bool = False) -> str:
     val = os.environ.get(key, default)
-    if required and not val:
+    if required and val is None:
         raise EnvironmentError(f"Required environment variable {key!r} is not set")
+    if required and val == "":
+        raise EnvironmentError(f"Required environment variable {key!r} is set but empty")
     return val  # type: ignore[return-value]
 
 
@@ -40,9 +42,26 @@ class AlpacaCreds:
 
     @classmethod
     def from_env(cls) -> AlpacaCreds:
+        # Accept both this project's names and Alpaca's standard SDK names.
+        api_key = (
+            os.environ.get("ALPACA_KEY")
+            or os.environ.get("APCA_API_KEY_ID")
+        )
+        api_secret = (
+            os.environ.get("ALPACA_SECRET")
+            or os.environ.get("APCA_API_SECRET_KEY")
+        )
+        if not api_key:
+            raise EnvironmentError(
+                "API key not found. Set ALPACA_KEY (or APCA_API_KEY_ID) environment variable."
+            )
+        if not api_secret:
+            raise EnvironmentError(
+                "API secret not found. Set ALPACA_SECRET (or APCA_API_SECRET_KEY) environment variable."
+            )
         return cls(
-            api_key=_env("ALPACA_KEY", required=True),
-            api_secret=_env("ALPACA_SECRET", required=True),
+            api_key=api_key,
+            api_secret=api_secret,
             paper=_env_bool("ALPACA_PAPER", default=True),
         )
 

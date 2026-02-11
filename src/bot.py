@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import signal
+import sys
 import time
 from enum import Enum
 
@@ -109,7 +110,17 @@ def run_loop() -> None:
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
-    creds, cfg = load_config()
+    try:
+        creds, cfg = load_config()
+    except (OSError, RuntimeError) as exc:
+        log.error(
+            "Fatal configuration error: %s — exiting. "
+            "Set ALPACA_KEY, ALPACA_SECRET, and ALPACA_PAPER=true as environment variables.",
+            exc,
+            extra={"event": "config_error"},
+        )
+        sys.exit(1)
+
     log.info(
         "Config loaded: symbol=%s dry_run=%s paper=%s",
         cfg.symbol, cfg.dry_run, creds.paper,
@@ -239,7 +250,7 @@ def tick(ctx, cfg, data_client, trading_client, risk_mgr) -> None:
             log.error("Entry order failed — staying ARMED")
             return
 
-        ctx.entry_price = fill.filled_avg_price or latest_price
+        ctx.entry_price = fill.filled_avg_price if fill.filled_avg_price is not None else latest_price
         ctx.direction = signal_entry.direction
         ctx.trade_qty = qty
         risk_mgr.record_trade()
