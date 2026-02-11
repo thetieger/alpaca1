@@ -13,10 +13,13 @@ The bot polls on a 1-minute cadence aligned to bar intervals.
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
 import time
 from enum import Enum
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
 
 from src.config import load_config
 from src.data import (
@@ -102,9 +105,31 @@ def _set_state(ctx: _Ctx, new_state: BotState) -> None:
     ctx.state = new_state
 
 
+class _HealthHandler(BaseHTTPRequestHandler):
+    """Minimal handler so Railway sees a live HTTP port."""
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+
+    def log_message(self, *args):  # suppress request logs
+        pass
+
+
+def _start_health_server() -> None:
+    """Start a tiny HTTP server on $PORT (Railway-assigned) in a daemon thread."""
+    port = int(os.environ.get("PORT", "8080"))
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    t = Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    logging.getLogger("bot").info("Health server listening on :%d", port,
+                                   extra={"event": "health_server"})
+
+
 def run_loop() -> None:
     """Entry point for the worker process."""
     setup_logging()
+    _start_health_server()
     log.info("Bot starting", extra={"event": "bot_start"})
 
     signal.signal(signal.SIGINT, _handle_signal)
