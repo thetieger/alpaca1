@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import signal
+import sys
 import time
 from enum import Enum
 
@@ -109,7 +110,17 @@ def run_loop() -> None:
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
-    creds, cfg = load_config()
+    try:
+        creds, cfg = load_config()
+    except (OSError, RuntimeError) as exc:
+        log.error(
+            "Fatal configuration error: %s — exiting. "
+            "Set ALPACA_KEY, ALPACA_SECRET, and ALPACA_PAPER=true as environment variables.",
+            exc,
+            extra={"event": "config_error"},
+        )
+        sys.exit(1)
+
     log.info(
         "Config loaded: symbol=%s dry_run=%s paper=%s",
         cfg.symbol, cfg.dry_run, creds.paper,
