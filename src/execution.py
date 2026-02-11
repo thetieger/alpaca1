@@ -100,7 +100,7 @@ def submit_entry_order(
             side=side.value,
             qty=qty,
             filled_avg_price=(
-                float(order.filled_avg_price) if order.filled_avg_price else None
+                float(order.filled_avg_price) if order.filled_avg_price is not None else None
             ),
         )
     except Exception:
@@ -157,7 +157,7 @@ def submit_exit_order(
             side=side.value,
             qty=qty,
             filled_avg_price=(
-                float(order.filled_avg_price) if order.filled_avg_price else None
+                float(order.filled_avg_price) if order.filled_avg_price is not None else None
             ),
         )
     except Exception:

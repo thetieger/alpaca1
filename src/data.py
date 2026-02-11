@@ -6,7 +6,7 @@ Provides historical bars and the prior-day close needed for gap calculation.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
@@ -35,7 +35,7 @@ def get_recent_bars(
     Fetch the most recent 1-minute bars for *symbol*.
     Returns a DataFrame with columns: open, high, low, close, volume, vwap.
     """
-    end = datetime.utcnow()
+    end = datetime.now(timezone.utc)
     start = end - timedelta(minutes=lookback_minutes + 5)  # small buffer
 
     request = StockBarsRequest(
@@ -68,7 +68,7 @@ def get_prior_close(
     Return the prior regular-session close price for *symbol*.
     Uses the previous trading day's daily bar.
     """
-    end = datetime.utcnow()
+    end = datetime.now(timezone.utc)
     start = end - timedelta(days=5)  # go back far enough to cover weekends
 
     request = StockBarsRequest(
@@ -88,11 +88,15 @@ def get_prior_close(
         bars = bars.droplevel("symbol")
 
     # The last completed daily bar is the prior session close.
-    # If today's bar is already present we want the second-to-last row.
-    if len(bars) < 2:
+    # Filter out today's (possibly partial) bar to reliably get yesterday's close.
+    today = datetime.now(timezone.utc).date()
+    completed = bars[bars.index.date < today]
+
+    if completed.empty:
+        # Fallback: use whatever bars we have.
         return float(bars.iloc[-1]["close"])
 
-    return float(bars.iloc[-2]["close"])
+    return float(completed.iloc[-1]["close"])
 
 
 def get_today_open(
@@ -103,7 +107,7 @@ def get_today_open(
     Return today's regular-session open price.
     Fetches today's first 1-minute bar.
     """
-    end = datetime.utcnow()
+    end = datetime.now(timezone.utc)
     # Start from midnight UTC — the first bar after 09:30 ET is the open.
     start = end.replace(hour=0, minute=0, second=0, microsecond=0)
 

@@ -239,7 +239,7 @@ def tick(ctx, cfg, data_client, trading_client, risk_mgr) -> None:
             log.error("Entry order failed — staying ARMED")
             return
 
-        ctx.entry_price = fill.filled_avg_price or latest_price
+        ctx.entry_price = fill.filled_avg_price if fill.filled_avg_price is not None else latest_price
         ctx.direction = signal_entry.direction
         ctx.trade_qty = qty
         risk_mgr.record_trade()
