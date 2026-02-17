@@ -24,6 +24,7 @@ from threading import Event, Thread
 from src.config import load_config
 from src.data import (
     build_data_client,
+    get_gap_data,
     get_latest_price,
     get_prior_close,
     get_recent_bars,
@@ -198,12 +199,21 @@ def tick(ctx, cfg, data_client, trading_client, risk_mgr) -> None:
         return
 
     # --- Fetch gap data once per day ---
-    if ctx.prior_close is None:
-        ctx.prior_close = get_prior_close(data_client, cfg.symbol)
+    if ctx.prior_close is None or ctx.today_open is None:
+        # Primary: use snapshot endpoint (single call for both values).
+        gap = get_gap_data(data_client, cfg.symbol)
+        if gap is not None:
+            ctx.prior_close = gap.prior_close
+            ctx.today_open = gap.today_open
+        else:
+            # Fallback: fetch each value individually via historical bars.
+            if ctx.prior_close is None:
+                ctx.prior_close = get_prior_close(data_client, cfg.symbol)
+            if ctx.today_open is None:
+                ctx.today_open = get_today_open(data_client, cfg.symbol)
+
         log.info("Prior close: %s", ctx.prior_close,
                  extra={"event": "prior_close", "price": ctx.prior_close})
-    if ctx.today_open is None:
-        ctx.today_open = get_today_open(data_client, cfg.symbol)
         log.info("Today open: %s", ctx.today_open,
                  extra={"event": "today_open", "price": ctx.today_open})
 
